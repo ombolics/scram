@@ -38,7 +38,7 @@ cycles and the grid they feed. Get it wrong and you get a SCRAM, or a meltdown.
 sim/   pure Java: physics, plant components, unit tests, JSON in/out
 mod/   NeoForge: block entities (tick the sim server-side, save/load),
        capabilities, menus and screens, networking, data loading
-web/   (planned) sim compiled to JS + an HTML page for tweaking numbers
+web/   prototype v0 browser simulator (web/prototype); later: Java sim compiled to JS
 docs/  roadmap and system specs (docs/specs/TEMPLATE.md)
 ```
 
