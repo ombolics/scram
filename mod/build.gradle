@@ -1,0 +1,38 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.+'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+neoForge {
+    // Pin an exact 21.1.x build once verified against https://maven.neoforged.net
+    version = '21.1.+'
+
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        scram {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    // TODO: decide how to ship `sim` inside the mod jar (jarJar or shadow).
+    implementation project(':sim')
+}

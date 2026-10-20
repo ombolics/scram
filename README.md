@@ -23,7 +23,7 @@ cycles and the grid they feed. Get it wrong and you get a SCRAM, or a meltdown.
 | Project type | A mod (Java code), not a modpack | Decided |
 | Loader | NeoForge | Decided |
 | Minecraft version | 1.21.1 | Decided (revisit if companion mods move to 26.x) |
-| Language | Java (Kotlin not ruled out) | Open |
+| Language | Java 21 | Decided |
 | Architecture | Pure-Java `sim` module (no Minecraft imports) plus a NeoForge `mod` module | Decided |
 | Server/client | Server owns the simulation; the client only displays synced values | Decided |
 | Simulation step | Fixed time step per game tick (1/20 s) | Decided |
@@ -39,7 +39,24 @@ sim/   pure Java: physics, plant components, unit tests, JSON in/out
 mod/   NeoForge: block entities (tick the sim server-side, save/load),
        capabilities, menus and screens, networking, data loading
 web/   (planned) sim compiled to JS + an HTML page for tweaking numbers
+docs/  roadmap and system specs (docs/specs/TEMPLATE.md)
 ```
+
+## Building
+
+Requires JDK 21.
+
+```
+./gradlew :sim:test          # simulation tests
+./gradlew build              # everything
+./gradlew runClient          # launch Minecraft with the mod (needs the mod module)
+```
+
+`-PskipMod` builds only `sim`, useful where maven.neoforged.net is unreachable.
+
+> The `mod` module is scaffolded but not yet verified to build: the `sim`
+> tests pass, but the NeoForge versions in `mod/build.gradle` have not been
+> checked against the NeoForge maven.
 
 Roles map roughly onto MVC/MVVM: `sim` is the model, block entities are the
 controllers, menus with synced data are the view-models, screens and

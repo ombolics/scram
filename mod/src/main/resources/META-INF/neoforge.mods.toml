@@ -1,0 +1,25 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "scram"
+version = "${file.jarVersion}"
+displayName = "SCRAM"
+description = '''
+Realistic nuclear and conventional power plants.
+'''
+
+[[dependencies.scram]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.scram]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.22)"
+ordering = "NONE"
+side = "BOTH"

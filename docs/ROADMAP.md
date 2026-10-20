@@ -2,7 +2,7 @@
 
 ## 0.1 — Foundation
 - [x] Pick loader and Minecraft version (NeoForge, 1.21.1)
-- [ ] Gradle scaffold: `sim` and `mod` modules, first unit test
+- [x] Gradle scaffold: `sim` and `mod` modules, first unit test (mod module still to be verified)
 - [ ] Proof of concept: `sim` compiled to JS and run in an HTML page
 - [ ] System spec template and issue templates
 
