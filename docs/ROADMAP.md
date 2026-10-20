@@ -1,13 +1,13 @@
 # Roadmap
 
 ## 0.1 — Foundation
-- [ ] Pick loader and Minecraft version
-- [ ] Choose a pack manifest tool (e.g. packwiz) and add the manifest
-- [ ] Select the core mods (see [MODS.md](MODS.md))
-- [ ] Launcher-ready export (CurseForge / Modrinth)
+- [x] Pick loader and Minecraft version (NeoForge, 1.21.1)
+- [ ] Gradle scaffold: `sim` and `mod` modules, first unit test
+- [ ] Proof of concept: `sim` compiled to JS and run in an HTML page
+- [ ] System spec template and issue templates
 
 ## 0.2 — Fission core
-- [ ] Reactor mod chosen and tuned
+- [ ] Reactor simulation model and block entities
 - [ ] Fuel cycle: ore, enrichment, fuel rods, spent fuel
 - [ ] Safety systems: control rods, SCRAM, coolant loss behaviour
 
@@ -17,8 +17,8 @@
 - [ ] Non-nuclear plants (coal, gas, hydro, wind, solar, geothermal)
 
 ## 0.4 — Progression
-- [ ] Quest book teaching plant design step by step
-- [ ] Recipe gating via KubeJS
+- [ ] In-game guide (Patchouli) teaching plant design step by step
+- [ ] Recipes and advancements gating progression
 
 ## Later
 - Waste reprocessing and storage
