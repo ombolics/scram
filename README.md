@@ -30,7 +30,7 @@ cycles and the grid they feed. Get it wrong and you get a SCRAM, or a meltdown.
 | Tuning data | Constants and designs in JSON, shared between sim, mod and web tool | Decided |
 | Engineer tooling | Browser tool running the sim (`web` module, Java compiled to JS, e.g. TeaVM) | Proposed, needs a proof of concept |
 | Mod compatibility | NeoForge energy/fluid/item capabilities; JEI/EMI, Jade/WTHIT; Patchouli for the guide | Proposed |
-| Relation to Mekanism | Complement or replace its reactor? | Open |
+| Relation to Mekanism | Standalone reactor and own simulation; expose NeoForge capabilities so it still connects to other mods' cables and pipes | Decided |
 
 ## Architecture
 
