@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SCRAM Control Room</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#080c11">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: a night-shift control room. One stage on top (the live plant), instruments under it,
+   operator controls beside it on wide screens, and a fixed dock with SCRAM always in thumb reach. */
+:root {
+  color-scheme: dark;
+  --bg: #080c11;
+  --panel: #0e151d;
+  --panel2: #131d28;
+  --line: #1d2b3a;
+  --line2: #2c4157;
+  --fg: #dbe7f3;
+  --mut: #8097ad;
+  --dim: #53697f;
+  --cyan: #4fd8f0;
+  --heat: #ff8a3d;
+  --amber: #ffc233;
+  --red: #ff4d5e;
+  --ok: #35d99b;
+  --steel: #2a3a4c;
+  --display: "Chakra Petch", "Arial Narrow", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body {
+  margin: 0; color: var(--fg); font-family: var(--display); font-size: 14px; line-height: 1.4;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px 124px;
+  background-image: radial-gradient(1200px 500px at 70% -10%, #112033 0%, transparent 60%);
+  background-repeat: no-repeat;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 14px; }
+
+/* header */
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; justify-content: space-between; }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 { margin: 0; font-size: 28px; letter-spacing: .22em; font-weight: 700; }
+.brand span { color: var(--mut); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 5px; overflow: hidden; background: var(--panel); }
+.seg button { border: 0; background: transparent; padding: 7px 12px; color: var(--mut); font-weight: 600; letter-spacing: .04em; min-height: 36px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--cyan); color: #04141a; }
+.seg button:disabled { opacity: .35; cursor: not-allowed; }
+.tierinfo { color: var(--mut); font-size: 13px; margin: 0; flex-basis: 100%; }
+
+.cols { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1000px) { .cols { grid-template-columns: minmax(0, 1.65fr) minmax(320px, 1fr); } }
+.stack { display: grid; gap: 14px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.panel > h2 { margin: 0; padding: 10px 14px 0; font-size: 11px; letter-spacing: .16em; color: var(--mut); text-transform: uppercase; font-weight: 600; }
+
+/* stage */
+.stage { position: relative; overflow: hidden; }
+.stage svg { display: block; width: 100%; height: auto; }
+.stage.shake svg { animation: shake .35s linear infinite; }
+@keyframes shake { 0%,100% { transform: translate(0,0) } 25% { transform: translate(-3px,2px) } 50% { transform: translate(2px,-3px) } 75% { transform: translate(-2px,-1px) } }
+.hud { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; flex-wrap: wrap; }
+.clock { font-family: var(--mono); font-size: 13px; color: var(--mut); background: #080c11cc; padding: 4px 8px; border-radius: 4px; }
+.pill { font-weight: 700; letter-spacing: .12em; font-size: 12px; padding: 5px 10px; border-radius: 4px; background: #080c11cc; border: 1px solid var(--line2); text-transform: uppercase; }
+.pill[data-s="ok"] { color: var(--ok); border-color: #1d6b50; }
+.pill[data-s="warn"] { color: var(--amber); border-color: #7a5f12; }
+.pill[data-s="crit"] { color: var(--red); border-color: #8a2733; animation: blink 1s steps(2) infinite; }
+.pill[data-s="idle"] { color: var(--mut); }
+@keyframes blink { 50% { opacity: .45; } }
+.statrow { position: absolute; left: 10px; bottom: 8px; font-family: var(--mono); font-size: 12px; color: var(--mut); background: #080c11cc; padding: 3px 8px; border-radius: 4px; pointer-events: none; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; background: radial-gradient(circle at 50% 45%, #5a0e18dd, #12060acc 70%); }
+.overlay[hidden] { display: none; }
+.overlay h3 { margin: 0 0 6px; font-size: clamp(26px, 6vw, 44px); letter-spacing: .14em; color: #fff; }
+.overlay p { margin: 0 auto 14px; max-width: 46ch; color: #ffd6da; }
+.overlay button { background: #fff; color: #3a0710; border: 0; border-radius: 4px; padding: 10px 18px; font-weight: 700; letter-spacing: .06em; }
+
+/* annunciator */
+.ann { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; padding: 10px; }
+.ann div { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-align: center; padding: 8px 4px; border-radius: 3px; background: #0a1118; color: #31475c; border: 1px solid var(--line); transition: background .15s, color .15s; }
+.ann div[data-l="warn"] { background: #3a2c05; color: var(--amber); border-color: #7a5f12; box-shadow: 0 0 14px #ffc23333; }
+.ann div[data-l="crit"] { background: #3c0b13; color: var(--red); border-color: #8a2733; box-shadow: 0 0 14px #ff4d5e44; animation: blink 1s steps(2) infinite; }
+.ann div[data-l="ok"] { background: #07281d; color: var(--ok); border-color: #1d6b50; }
+
+/* gauges */
+.gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 10px; }
+.g { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 9px 10px 10px; min-width: 0; }
+.g .lab { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--mut); display: flex; justify-content: space-between; gap: 6px; }
+.g .val { font-family: var(--mono); font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
+.g .val small { font-size: 12px; color: var(--mut); margin-left: 4px; }
+.g .sub { font-family: var(--mono); font-size: 11px; color: var(--dim); min-height: 15px; }
+.g .bar { position: relative; height: 5px; border-radius: 3px; background: #0a1118; margin-top: 6px; overflow: hidden; }
+.g .bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ok); }
+.g[data-l="warn"] .val { color: var(--amber); } .g[data-l="warn"] .bar i { background: var(--amber); }
+.g[data-l="crit"] .val { color: var(--red); } .g[data-l="crit"] .bar i { background: var(--red); }
+
+/* controls */
+.ctl { padding: 12px 14px 14px; display: grid; gap: 14px; }
+.row { display: grid; gap: 6px; }
+.row .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.row label, .row .nm { font-weight: 600; letter-spacing: .06em; }
+.row .rd { font-family: var(--mono); color: var(--cyan); font-size: 13px; font-variant-numeric: tabular-nums; }
+.row small { color: var(--dim); }
+input[type=range] { width: 100%; height: 34px; background: transparent; accent-color: var(--cyan); margin: 0; }
+input[type=range]:disabled { opacity: .45; }
+.tog { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line2); background: var(--panel2); border-radius: 4px; padding: 6px 10px; font-weight: 600; letter-spacing: .06em; min-height: 36px; }
+.tog[aria-pressed="true"] { border-color: var(--cyan); color: var(--cyan); }
+.tog::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--dim); }
+.tog[aria-pressed="true"]::before { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line2); background: var(--panel2); border-radius: 4px; padding: 8px 11px; min-height: 38px; font-weight: 600; letter-spacing: .03em; }
+.chip:hover { border-color: var(--mut); }
+.chip.danger { border-color: #6b2a33; color: #ff9aa5; }
+.chip.good { border-color: #1d6b50; color: var(--ok); }
+.chip[aria-pressed="true"] { background: #0d2a35; border-color: var(--cyan); color: var(--cyan); }
+.chip:disabled { opacity: .35; cursor: not-allowed; }
+.grp { font-size: 11px; letter-spacing: .16em; color: var(--mut); text-transform: uppercase; margin-bottom: 6px; }
+details { color: var(--mut); font-size: 13px; }
+details summary { cursor: pointer; color: var(--fg); font-weight: 600; }
+details ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+
+/* charts */
+.charts { padding: 10px; display: grid; gap: 8px; }
+.charts .hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 4px; }
+.charts canvas { width: 100%; height: 110px; display: block; background: #0a1118; border: 1px solid var(--line); border-radius: 4px; }
+
+/* log */
+.log { list-style: none; margin: 0; padding: 8px 14px 12px; max-height: 220px; overflow: auto; font-family: var(--mono); font-size: 12px; display: grid; gap: 4px; }
+.log li { display: flex; gap: 8px; }
+.log time { color: var(--dim); flex: none; }
+.log .crit { color: var(--red); } .log .warn { color: var(--amber); } .log .info { color: var(--mut); } .log .ok { color: var(--ok); }
+
+footer { color: var(--dim); font-size: 12px; max-width: 80ch; }
+footer a { color: var(--mut); }
+
+/* dock */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(#080c1100, #080c11 22%); border-top: 1px solid var(--line);
+  backdrop-filter: blur(6px);
+}
+.dock .in { max-width: 1240px; width: 100%; margin: 0 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+.dock .seg button { padding: 7px 9px; }
+.scram {
+  width: 74px; height: 74px; border-radius: 50%; border: 3px solid #ffb3ba; color: #fff; font-weight: 700; letter-spacing: .08em; font-size: 14px;
+  background: radial-gradient(circle at 50% 35%, #ff6b79, #c4152a 70%); box-shadow: 0 0 0 5px #2a0a10, 0 0 24px #ff4d5e66; flex: none;
+}
+.scram:active { transform: scale(.96); }
+.scram:disabled { filter: grayscale(.7) brightness(.6); box-shadow: none; cursor: default; }
+.dockgrp { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dockgrp .lbl { font-size: 11px; letter-spacing: .14em; color: var(--mut); text-transform: uppercase; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage.shake svg, .pill[data-s="crit"], .ann div[data-l="crit"] { animation: none; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand"><h1>SCRAM</h1><span>Control room prototype v0</span></div>
+    <div class="seg" id="tiers" role="group" aria-label="Reactor generation">
+      <button data-tier="1" aria-pressed="false">Gen I</button>
+      <button data-tier="2" aria-pressed="true">Gen II</button>
+      <button data-tier="3" aria-pressed="false">Gen III+</button>
+      <button data-tier="4" disabled title="Not built yet">Gen IV</button>
+    </div>
+    <button class="tog" id="snd" aria-pressed="false">Sound</button>
+    <p class="tierinfo" id="tierinfo"></p>
+  </header>
+
+  <div class="cols">
+    <div class="stack">
+      <section class="panel stage" id="stage" aria-label="Live plant schematic">
+        <svg id="plant" viewBox="0 0 900 520" role="img" aria-label="Pressurised water reactor plant: reactor, steam generator, turbine, generator, cooling tower and city grid">
+          <defs>
+            <clipPath id="vesselClip"><rect x="150" y="190" width="100" height="200" rx="40"/></clipPath>
+            <clipPath id="sgClip"><rect x="430" y="150" width="80" height="250" rx="34"/></clipPath>
+            <filter id="b10" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="10"/></filter>
+            <filter id="b4" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="4"/></filter>
+            <linearGradient id="steel" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#3a4d62"/><stop offset=".5" stop-color="#22313f"/><stop offset="1" stop-color="#17222d"/></linearGradient>
+            <linearGradient id="dome" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#142132"/><stop offset="1" stop-color="#0c141d"/></linearGradient>
+            <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="#14202d" stroke-width="1"/></pattern>
+          </defs>
+          <rect width="900" height="520" fill="#080c11"/>
+          <rect width="900" height="520" fill="url(#grid)"/>
+          <!-- containment -->
+          <path d="M40 470V250A175 175 0 0 1 390 250V470Z" fill="url(#dome)" stroke="#2c4157" stroke-width="3"/>
+          <text x="215" y="108" text-anchor="middle" font-size="16" letter-spacing="3" fill="#53697f" font-family="Chakra Petch, sans-serif">CONTAINMENT</text>
+          <!-- primary loop pipes -->
+          <path d="M250 245H395V330H440" fill="none" stroke="#1a2735" stroke-width="16" stroke-linejoin="round"/>
+          <path d="M500 400V445H215V390" fill="none" stroke="#1a2735" stroke-width="16" stroke-linejoin="round"/>
+          <path id="hotLeg" d="M250 245H395V330H440" fill="none" stroke="#ff8a3d" stroke-width="7" stroke-dasharray="14 10" stroke-linejoin="round"/>
+          <path id="coldLeg" d="M500 400V445H215V390" fill="none" stroke="#ff8a3d" stroke-width="7" stroke-dasharray="14 10" stroke-linejoin="round"/>
+          <!-- reactor vessel -->
+          <rect x="146" y="186" width="108" height="208" rx="44" fill="url(#steel)" stroke="#3d556e" stroke-width="3"/>
+          <rect x="188" y="168" width="24" height="22" fill="#2a3a4c" stroke="#3d556e" stroke-width="2"/>
+          <g clip-path="url(#vesselClip)">
+            <rect x="150" y="190" width="100" height="200" fill="#0b141d"/>
+            <rect id="vWater" x="150" y="190" width="100" height="200" fill="#ff8a3d" opacity=".55"/>
+            <ellipse id="cherenkov" cx="200" cy="337" rx="46" ry="52" fill="#4fd8f0" opacity="0" filter="url(#b10)"/>
+            <rect id="fuel" x="168" y="300" width="64" height="74" rx="5" fill="#2a3441" stroke="#0b141d" stroke-width="2"/>
+            <g stroke="#0b141d" stroke-width="2" opacity=".8"><path d="M179 300V374M190 300V374M201 300V374M212 300V374M223 300V374"/></g>
+            <g id="rods"></g>
+          </g>
+          <text x="98" y="215" text-anchor="middle" font-size="15" letter-spacing="2" fill="#8097ad" font-family="Chakra Petch, sans-serif">REACTOR</text>
+          <!-- pump -->
+          <circle cx="340" cy="445" r="22" fill="#17222d" stroke="#3d556e" stroke-width="3"/>
+          <g id="pump" transform="translate(340 445)"><path d="M0 0L14 0M0 0L-7 12M0 0L-7 -12" stroke="#4fd8f0" stroke-width="4" stroke-linecap="round"/></g>
+          <!-- steam generator -->
+          <rect x="426" y="146" width="88" height="258" rx="38" fill="url(#steel)" stroke="#3d556e" stroke-width="3"/>
+          <g clip-path="url(#sgClip)">
+            <rect x="430" y="150" width="80" height="250" fill="#0b141d"/>
+            <rect id="sgSteam" x="430" y="150" width="80" height="250" fill="#cfe7ff" opacity=".12"/>
+            <rect id="sgWater" x="430" y="230" width="80" height="170" fill="#3b8fd6" opacity=".7"/>
+            <g id="bubbles"></g>
+            <path id="tubes" d="M440 330V215q0-26 30-26t30 26V400" fill="none" stroke="#ff8a3d" stroke-width="5" stroke-linecap="round"/>
+          </g>
+          <text x="522" y="296" font-size="14" letter-spacing="2" fill="#8097ad" font-family="Chakra Petch, sans-serif">STEAM</text><text x="522" y="314" font-size="14" letter-spacing="2" fill="#8097ad" font-family="Chakra Petch, sans-serif">GEN.</text>
+          <!-- steam line + valve puff -->
+          <path d="M470 146V96H640V140" fill="none" stroke="#1a2735" stroke-width="12" stroke-linejoin="round"/>
+          <path id="steamLine" d="M470 146V96H640V140" fill="none" stroke="#cfe7ff" stroke-width="4" stroke-dasharray="3 14" stroke-linecap="round" opacity=".7"/>
+          <g id="puffs"></g>
+          <!-- turbine + generator -->
+          <circle cx="640" cy="190" r="50" fill="#17222d" stroke="#3d556e" stroke-width="3"/>
+          <g id="turb" transform="translate(640 190)"></g>
+          <path d="M690 190H706" stroke="#3d556e" stroke-width="6"/>
+          <circle cx="740" cy="190" r="34" fill="#17222d" stroke="#3d556e" stroke-width="3"/>
+          <g id="gen" transform="translate(740 190)"><path d="M0 -24V24M-21 -12L21 12M-21 12L21 -12" stroke="#ffc233" stroke-width="4" stroke-linecap="round"/></g>
+          <text x="606" y="82" font-size="14" letter-spacing="2" fill="#8097ad" font-family="Chakra Petch, sans-serif">TURBINE</text>
+          <text x="722" y="82" font-size="14" letter-spacing="2" fill="#8097ad" font-family="Chakra Petch, sans-serif">GEN.</text>
+          <!-- condenser + tower -->
+          <rect x="606" y="284" width="68" height="26" rx="4" fill="#17222d" stroke="#3d556e" stroke-width="2"/>
+          <path d="M640 240V284" stroke="#3d556e" stroke-width="6"/>
+          <path d="M640 310V345" stroke="#3d556e" stroke-width="6"/>
+          <path d="M586 470Q612 410 604 346H696Q688 410 714 470Z" fill="url(#steel)" stroke="#3d556e" stroke-width="3"/>
+          <text x="650" y="458" text-anchor="middle" font-size="13" letter-spacing="2" fill="#8097ad" font-family="Chakra Petch, sans-serif">COOLING</text>
+          <g id="plume"></g>
+          <!-- grid -->
+          <path d="M774 190H820V96" fill="none" stroke="#3d556e" stroke-width="4"/>
+          <path d="M820 96H890" fill="none" stroke="#3d556e" stroke-width="3"/>
+          <path id="wire" d="M774 190H820V96H890" fill="none" stroke="#ffc233" stroke-width="3" stroke-dasharray="4 12" stroke-linecap="round" opacity="0"/>
+          <path d="M812 100L820 70L828 100M806 84H834" fill="none" stroke="#53697f" stroke-width="3"/>
+          <g id="city"></g>
+          <path d="M0 470H900" stroke="#2c4157" stroke-width="3"/>
+        </svg>
+        <div class="hud">
+          <div class="clock" id="clock">T+00:00:00</div>
+          <div class="pill" id="status" data-s="ok">Online</div>
+        </div>
+        <div class="statrow" id="statrow"></div>
+        <div class="overlay" id="melt" hidden>
+          <div>
+            <h3>CORE MELTDOWN</h3>
+            <p id="meltWhy"></p>
+            <button id="meltReset">Restart plant</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Annunciator panel">
+        <div class="ann" id="ann"></div>
+      </section>
+
+      <section class="panel" aria-label="Instruments">
+        <h2>Instruments</h2>
+        <div class="gauges" id="gauges"></div>
+      </section>
+
+      <section class="panel" aria-label="Trends">
+        <h2>Trends</h2>
+        <div class="charts">
+          <div class="hd">
+            <span class="grp" style="margin:0">History window</span>
+            <div class="seg" id="win" role="group" aria-label="History window">
+              <button data-w="120" aria-pressed="false">2 min</button>
+              <button data-w="600" aria-pressed="true">10 min</button>
+              <button data-w="3600" aria-pressed="false">1 h</button>
+              <button data-w="14400" aria-pressed="false">4 h</button>
+            </div>
+          </div>
+          <canvas id="c1" aria-label="Power trend"></canvas>
+          <canvas id="c2" aria-label="Temperature trend"></canvas>
+          <canvas id="c3" aria-label="Pressure and inventory trend"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <div class="stack">
+      <section class="panel" aria-label="Operator controls">
+        <h2>Operator</h2>
+        <div class="ctl">
+          <div class="row">
+            <div class="top"><label for="rod">Control rods (inserted)</label><span class="rd" id="rodRd">8%</span></div>
+            <input type="range" id="rod" min="0" max="100" step="1" value="8">
+            <div class="top"><button class="tog" id="auto" aria-pressed="false">Auto rod control</button><small>Holds coolant temperature on a load-following program</small></div>
+          </div>
+          <div class="row">
+            <div class="top"><label for="pump">Coolant pumps</label><span class="rd" id="pumpRd">100%</span></div>
+            <input type="range" id="pump" min="0" max="100" step="1" value="100">
+          </div>
+          <div class="row">
+            <div class="top"><label for="dem">Grid demand</label><span class="rd" id="demRd">1000 MWe</span></div>
+            <input type="range" id="dem" min="0" max="110" step="1" value="100">
+          </div>
+          <div>
+            <div class="grp">Things that go wrong</div>
+            <div class="chips">
+              <button class="chip danger" data-ev="pump">Pump trip</button>
+              <button class="chip danger" data-ev="load">Load rejection</button>
+              <button class="chip danger" data-ev="loca">Small leak (LOCA)</button>
+              <button class="chip danger" data-ev="sbo">Blackout</button>
+            </div>
+          </div>
+          <div>
+            <div class="grp">Recovery</div>
+            <div class="chips">
+              <button class="chip" data-ev="reset-trip">Reset trip</button>
+              <button class="chip good" data-ev="ac">Restore AC power</button>
+              <button class="chip" data-ev="makeup" id="makeup" aria-pressed="false">Makeup water</button>
+              <button class="chip" data-ev="plug">Isolate leak</button>
+            </div>
+          </div>
+          <div>
+            <div class="grp">Scenarios</div>
+            <div class="chips">
+              <button class="chip" data-ev="new-full">Full power</button>
+              <button class="chip" data-ev="new-standby">Hot standby start-up</button>
+            </div>
+          </div>
+          <details>
+            <summary>How to play</summary>
+            <ul>
+              <li>Keep thermal power, fuel temperature and steam pressure inside limits while the grid asks for power.</li>
+              <li>Cut demand and watch the plant fight back: steam pressure rises, coolant heats, power falls on its own.</li>
+              <li>Hit SCRAM any time. Shutdown is not cooling: decay heat keeps going for hours.</li>
+              <li>Compare Gen I, II and III+ with the same fault, for example Blackout at 300x speed.</li>
+              <li>Start-up: pick Hot standby, set speed to 30x, pull rods out slowly, then raise demand.</li>
+            </ul>
+          </details>
+        </div>
+      </section>
+
+      <section class="panel" aria-label="Event log">
+        <h2>Event log</h2>
+        <ul class="log" id="log"></ul>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    Prototype v0 of the <a href="https://github.com/ombolics/scram" target="_blank" rel="noopener">SCRAM</a> simulation. A toy model with made-up coefficients, not validated physics. The numbers are placeholders until the engineers write the system specs. The model will move into the Java <code>sim</code> module.
+  </footer>
+</div>
+
+<div class="dock">
+  <div class="in">
+    <button class="scram" id="scram" aria-label="SCRAM: insert all control rods now">SCRAM</button>
+    <div class="dockgrp">
+      <div class="seg" id="speed" role="group" aria-label="Simulation speed">
+        <button data-sp="1" aria-pressed="false">1x</button>
+        <button data-sp="5" aria-pressed="true">5x</button>
+        <button data-sp="30" aria-pressed="false">30x</button>
+        <button data-sp="300" aria-pressed="false">300x</button>
+      </div>
+    </div>
+    <div class="dockgrp">
+      <button class="tog" id="pause" aria-pressed="false">Pause</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* SCRAM v0 toy plant model. Units: MW, MJ, K/degC, bar, s.
+   Illustrative placeholder physics, NOT validated. Throwaway JS port of what will live in the Java `sim` module. */
+const PNOM = 3000, PE_NOM = 1000, BETA = 0.0065, LAMBDA = 0.06;
+const K_ROD = 0.06, R0 = 0.08, A_F = -3e-5, A_C = -1e-4, TF0 = 605, TC0 = 305;
+const CF = 60, CC = 3000, H_FC = 10, UA_SG = 142.2, CS = 1500, UA_PASS = 0.6;
+const DECAY = [{ a: 0.02, tau: 60 }, { a: 0.02, tau: 1200 }, { a: 0.01, tau: 20000 }];
+const LIM = { fluxTrip: 1.15, tfTrip: 1000, pTrip: 80, mTrip: 0.9, damage: 1200, melt: 2000 };
+const T_BOIL = 345, E_BOIL = 150000, E_SEC = 150000;
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const tsat = p => 100 * Math.pow(Math.max(p, 0.1), 0.25);
+
+function fmtTime(t) {
+  t = Math.floor(t);
+  const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function newPlant(tier, mode) {
+  const s = {
+    tier: tier || 2, t: 0, c: 1, n: 1, d: DECAY.map(x => x.a), Tf: 605, Tc: 305, p: 65,
+    r: R0, rT: R0, auto: false, ei: 0, f: 1, fCmd: 1, D: 1000, v: 1, m: 1, Ms: 1, leak: 0,
+    ac: true, makeup: false, tripped: false, tripReason: '', turbTrip: false, damage: 0, delivered: 0, shortfall: 0,
+    Q: PNOM, Pe: PE_NOM, rho: 0, Qsg: PNOM, Qdump: 0, Qsv: 0, Qpass: 0, eccs: false, log: []
+  };
+  if (mode === 'standby') {
+    s.n = s.c = 0.002; s.d = DECAY.map(x => x.a * 0.002);
+    s.Tf = s.Tc = 285; s.p = 65; s.r = s.rT = 0.273; s.D = 0; s.v = 0; s.Q = 6; s.Pe = 0; s.Qsg = 6;
+  }
+  return s;
+}
+
+function logEv(s, msg, kind) { s.logCount = (s.logCount || 0) + 1; s.log.push({ id: s.logCount, t: s.t, msg, kind: kind || 'info' }); if (s.log.length > 60) s.log.shift(); }
+
+function scram(s, why) {
+  if (s.tripped) return;
+  s.tripped = true; s.tripReason = why; s.auto = false;
+  if (s.tier >= 2) s.turbTrip = true;
+  logEv(s, 'REACTOR TRIP: ' + why, 'crit');
+}
+
+function resetTrip(s) {
+  if (!s.tripped) return;
+  s.tripped = false; s.tripReason = ''; s.turbTrip = false;
+  logEv(s, 'Trip reset by operator', 'info');
+}
+
+function step(s, dt) {
+  const ff = 0.05 + 0.95 * s.f;
+  // pumps
+  const fT = s.ac ? s.fCmd : 0;
+  s.f += (fT - s.f) * dt / (s.ac ? 8 : 12);
+  // control rods
+  if (s.tripped) {
+    s.r = Math.min(1, s.r + 0.8 * dt); s.rT = s.r;
+  } else if (s.auto) {
+    const Tref = 286 + 19 * Math.min(s.D, PE_NOM) / PE_NOM;
+    const e = s.Tc - Tref;
+    s.ei = clamp(s.ei + e * dt, -60, 60);
+    const vel = clamp(0.0004 * e + 0.00001 * s.ei, -0.0015, 0.0015);
+    s.r = clamp(s.r + vel * dt, 0, 1); s.rT = s.r;
+  } else {
+    s.r += clamp(s.rT - s.r, -0.006 * dt, 0.006 * dt);
+  }
+  // neutronics (one delayed group, prompt-jump approximation)
+  const cov = clamp((s.m - 0.45) / 0.3, 0, 1);
+  let rho = K_ROD * (R0 - s.r) + A_F * (s.Tf - TF0) + A_C * (s.Tc - TC0) - 0.05 * (1 - cov);
+  rho = Math.min(rho, 0.85 * BETA);
+  s.rho = rho;
+  s.n = Math.max(1e-7, s.c * BETA / (BETA - rho));
+  s.c = Math.max(1e-7, s.c + LAMBDA * s.c * rho / (BETA - rho) * dt);
+  for (let i = 0; i < 3; i++) s.d[i] += (DECAY[i].a * s.n - s.d[i]) / DECAY[i].tau * dt;
+  const Q = PNOM * (0.95 * s.n + s.d[0] + s.d[1] + s.d[2]);
+  s.Q = Q;
+  // primary / fuel
+  const Qfc = H_FC * (0.1 + 0.9 * ff) * Math.max(cov, 0.003) * (s.Tf - s.Tc);
+  const sgCov = clamp((s.m - 0.2) / 0.5, 0.05, 1) * clamp(s.Ms / 0.25, 0, 1);
+  const Tsat = tsat(s.p);
+  const Qsg = Math.min(3600 * ff, Math.max(0, UA_SG * (0.1 + 0.9 * Math.pow(ff, 0.8)) * sgCov * (s.Tc - Tsat)));
+  s.Qsg = Qsg;
+  s.Qpass = (s.tier >= 3 && s.tripped && s.m > 0.4) ? UA_PASS * Math.max(s.Tc - 40, 0) : 0;
+  const eccsAvail = s.tier >= 2 && (s.ac || s.tier >= 3);
+  s.eccs = eccsAvail && s.tripped && s.m < 0.88;
+  const manual = s.makeup && s.ac && s.m < 1;
+  const inj = s.eccs ? 0.006 : (manual ? 0.004 : 0);
+  const Qeccs = inj * CC * 0.5 * Math.max(s.Tc - 40, 0);
+  s.Tf += (Q - Qfc) / CF * dt;
+  s.Tc += (Qfc - Qsg - s.Qpass - Qeccs) / (CC * Math.max(s.m, 0.35)) * dt;
+  if (s.Tc > T_BOIL) {
+    const excess = (s.Tc - T_BOIL) * CC * Math.max(s.m, 0.35);
+    s.m = Math.max(0, s.m - excess / E_BOIL);
+    s.Tc = T_BOIL;
+  }
+  s.m = clamp(s.m + (inj - s.leak) * dt, 0, 1);
+  // turbine and secondary
+  const vT = (!s.ac || s.turbTrip) ? 0 : clamp(s.D / (PE_NOM * (s.p / 65)), 0, 1);
+  if (vT === 0) s.v = Math.max(0, s.v - 0.5 * dt); else s.v += clamp(vT - s.v, -0.1 * dt, 0.1 * dt);
+  const Qt = s.v * PNOM * (s.p / 65);
+  s.Pe = Qt / 3;
+  s.Qdump = (s.ac && s.tier >= 2) ? clamp((s.p - 72) / 10, 0, 1) * 1200 * (s.p / 65) : 0;
+  s.Qsv = clamp((s.p - 85) / 8, 0, 1) * PNOM * (s.p / 65);
+  s.p = clamp(s.p + (Qsg - Qt - s.Qdump - s.Qsv) / CS * dt, 1, 200);
+  s.Ms = clamp(s.Ms - s.Qsv / E_SEC * dt + (s.ac ? (1 - s.Ms) * 0.01 * dt : 0), 0, 1);
+  // bookkeeping
+  s.t += dt;
+  s.delivered += s.Pe * dt / 3600 / 1000;
+  s.shortfall = Math.max(0, s.D - s.Pe);
+  // protection
+  if (s.tier >= 2 && !s.tripped) {
+    const qf = Q / PNOM;
+    if (s.m < LIM.mTrip) scram(s, 'low coolant inventory');
+    else if (qf > LIM.fluxTrip) scram(s, 'high neutron flux');
+    else if (s.Tf > LIM.tfTrip) scram(s, 'high fuel temperature');
+    else if (s.p > LIM.pTrip) scram(s, 'high steam pressure');
+    else if (s.f < 0.4 && qf > 0.2) scram(s, 'low coolant flow');
+    else if (!s.ac) scram(s, 'loss of AC power');
+  }
+  if (s.damage < 1 && s.Tf > LIM.damage) { s.damage = 1; logEv(s, 'FUEL DAMAGE: cladding failure, fission products released', 'crit'); }
+  if (s.damage < 2 && s.Tf > LIM.melt) { s.damage = 2; logEv(s, 'CORE MELTDOWN', 'crit'); }
+}
+
+
+</script>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const hex = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  function ramp(stops, x) {
+    if (x <= stops[0][0]) return stops[0][1];
+    for (let i = 1; i < stops.length; i++) {
+      if (x <= stops[i][0]) {
+        const [x0, c0] = stops[i - 1], [x1, c1] = stops[i], t = (x - x0) / (x1 - x0);
+        const a = hex(c0), b = hex(c1);
+        return 'rgb(' + a.map((v, k) => Math.round(lerp(v, b[k], t))).join(',') + ')';
+      }
+    }
+    return stops[stops.length - 1][1];
+  }
+  const FUEL = [[20, '#2a3441'], [300, '#4a3b3b'], [600, '#c2562a'], [900, '#ff8a3d'], [1200, '#ffd24a'], [1600, '#fff1c2'], [2000, '#ffffff']];
+  const WATER = [[20, '#2f6df6'], [120, '#2fb6f6'], [240, '#f0c040'], [305, '#ff8a3d'], [360, '#ff4d5e']];
+
+  /* ---------- state ---------- */
+  let tier = 2, s = newPlant(tier), speed = 5, paused = false, winSec = 600;
+  let hist = [], lastHist = -1, lastLogId = 0, meltShown = false, soundOn = false, actx = null;
+
+  const TIERINFO = {
+    1: 'Gen I: no automatic protection. Manual SCRAM and manual makeup water only. You are the safety system.',
+    2: 'Gen II: automatic trips, turbine steam dump, and an emergency cooling pump that needs AC power.',
+    3: 'Gen III+: adds passive safety. Gravity-fed emergency cooling and passive decay heat removal work with no power at all.',
+    4: 'Gen IV: not built yet.'
+  };
+
+  /* ---------- scene setup ---------- */
+  const rods = $('rods');
+  const rodEls = [178, 190, 201, 212, 223].map(x => {
+    const g = mk('g', {}, rods);
+    mk('rect', { x: x - 3, y: 150, width: 6, height: 112, fill: '#aeb9c6', stroke: '#0b141d', 'stroke-width': 1.5 }, g);
+    return g;
+  });
+  const turb = $('turb');
+  const blades = mk('g', {}, turb);
+  for (let i = 0; i < 12; i++) mk('path', { d: 'M0 0L' + (42 * Math.cos(i * Math.PI / 6)).toFixed(1) + ' ' + (42 * Math.sin(i * Math.PI / 6)).toFixed(1), stroke: i % 2 ? '#4fd8f0' : '#8bb4d4', 'stroke-width': 4, 'stroke-linecap': 'round' }, blades);
+  mk('circle', { r: 8, fill: '#0b141d', stroke: '#4fd8f0', 'stroke-width': 2 }, turb);
+  const bubbles = [], bubG = $('bubbles');
+  for (let i = 0; i < 14; i++) bubbles.push({ e: mk('circle', { r: 2 + (i % 3), fill: '#dff1ff', opacity: 0 }, bubG), x: 436 + (i * 53 % 66) + 4, y: 300, v: 20 + (i * 7 % 18), ph: i * 0.13 });
+  const plumeG = $('plume'), plume = [];
+  for (let i = 0; i < 12; i++) plume.push({ e: mk('circle', { r: 10, fill: '#dbe7f3', opacity: 0, filter: 'url(#b4)' }, plumeG), ph: i / 12, dx: ((i * 37) % 40) - 20 });
+  const puffG = $('puffs'), puffs = [];
+  for (let i = 0; i < 8; i++) puffs.push({ e: mk('circle', { r: 6, fill: '#fff', opacity: 0, filter: 'url(#b4)' }, puffG), ph: i / 8 });
+  const cityG = $('city'), wins = [];
+  [[760, 74, 36], [800, 110, 34], [838, 58, 40], [868, 92, 24]].forEach(([x, h, w], bi) => {
+    mk('rect', { x: x, y: 470 - h, width: w, height: h, fill: '#101a25', stroke: '#2c4157', 'stroke-width': 2 }, cityG);
+    for (let yy = 470 - h + 8; yy < 462; yy += 14) for (let xx = x + 6; xx < x + w - 6; xx += 10) wins.push(mk('rect', { x: xx, y: yy, width: 5, height: 7, fill: '#1c2a3a' }, cityG));
+  });
+  // light windows from the middle outward in a stable pseudo-random order
+  const winOrder = wins.map((_, i) => i).sort((a, b) => ((a * 7919) % 101) - ((b * 7919) % 101));
+  const hotLeg = $('hotLeg'), coldLeg = $('coldLeg');
+  let dashOff = 0, angT = 0, angG = 0, angP = 0, wireOff = 0, steamOff = 0, tAnim = 0;
+
+  /* ---------- gauges ---------- */
+  const G = [
+    { id: 'pw', lab: 'Thermal power', unit: '%', max: 120, get: s => s.Q / PNOM * 100, warn: 105, crit: 115, fmt: v => v < 10 ? v.toFixed(1) : v.toFixed(0) },
+    { id: 'pe', lab: 'Electric output', unit: 'MWe', max: 1100, get: s => s.Pe, fmt: v => v.toFixed(0), sub: s => 'demand ' + s.D.toFixed(0), shortfall: true },
+    { id: 'tc', lab: 'Coolant temp', unit: '°C', max: 360, get: s => s.Tc, warn: 325, crit: 345, fmt: v => v.toFixed(0) },
+    { id: 'tf', lab: 'Fuel temp', unit: '°C', max: 2100, get: s => s.Tf, warn: 900, crit: 1200, fmt: v => v.toFixed(0), sub: s => 'damage 1200, melt 2000' },
+    { id: 'p', lab: 'Steam pressure', unit: 'bar', max: 100, get: s => s.p, warn: 78, crit: 85, fmt: v => v.toFixed(1) },
+    { id: 'm', lab: 'Coolant inventory', unit: '%', max: 100, get: s => s.m * 100, low: [90, 60], fmt: v => v.toFixed(0), sub: s => s.leak > 0 ? 'LEAK ' + (s.leak * 100).toFixed(2) + ' %/s' : (s.eccs ? 'emergency cooling' : (s.makeup ? 'makeup on' : '')) },
+    { id: 'rho', lab: 'Reactivity', unit: '$', max: 9, get: s => s.rho / BETA, fmt: v => Math.abs(v) < 0.005 ? '0.00' : (v >= 0 ? '+' : '') + v.toFixed(2), off: 8, warn: 0.5, crit: 0.8, sub: s => '1$ = prompt critical' },
+    { id: 'dh', lab: 'Decay heat', unit: 'MW', max: 160, get: s => (s.d[0] + s.d[1] + s.d[2]) * PNOM, fmt: v => v.toFixed(0), sub: s => (((s.d[0] + s.d[1] + s.d[2]) * 100)).toFixed(1) + '% of full power' }
+  ];
+  const gEls = {};
+  $('gauges').innerHTML = G.map(g => '<div class="g" id="g-' + g.id + '" data-l="ok"><div class="lab"><span>' + g.lab + '</span></div><div class="val"><span class="v">0</span><small>' + g.unit + '</small></div><div class="sub"></div><div class="bar"><i></i></div></div>').join('');
+  G.forEach(g => { const e = $('g-' + g.id); gEls[g.id] = { e, v: e.querySelector('.v'), sub: e.querySelector('.sub'), bar: e.querySelector('i') }; });
+
+  const A = [
+    ['TRIP', s => s.tripped ? 'crit' : 0], ['HI FLUX', s => s.Q / PNOM > 1.05 ? 'warn' : 0], ['HI FUEL T', s => s.Tf > 1200 ? 'crit' : (s.Tf > 900 ? 'warn' : 0)],
+    ['HI PRESS', s => s.p > 78 ? 'warn' : 0], ['SAFETY VALVE', s => s.Qsv > 10 ? 'crit' : 0], ['LO INVENTORY', s => s.m < 0.9 ? (s.m < 0.6 ? 'crit' : 'warn') : 0],
+    ['LO FLOW', s => s.f < 0.5 ? 'warn' : 0], ['NO AC POWER', s => !s.ac ? 'crit' : 0], ['TURBINE TRIP', s => s.turbTrip ? 'warn' : 0],
+    ['GRID SHORT', s => s.shortfall > 50 && s.D > 0 ? 'warn' : 0], ['EMERG COOLING', s => s.eccs ? 'ok' : 0], ['PASSIVE COOLING', s => s.Qpass > 1 ? 'ok' : 0]
+  ];
+  $('ann').innerHTML = A.map(a => '<div data-l="0">' + a[0] + '</div>').join('');
+  const annEls = [...$('ann').children];
+
+  /* ---------- charts ---------- */
+  function drawChart(cv, o) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight;
+    if (!w) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+    const L = 34, R = 8, T = 8, B = 16, pw = w - L - R, ph = h - T - B;
+    const t1 = s.t, t0 = t1 - winSec;
+    let ymax = o.ymax;
+    if (o.auto) { let m = o.min; for (const p of hist) if (p.t >= t0) for (const sr of o.series) m = Math.max(m, sr.get(p)); ymax = Math.ceil(m * 1.08 / 100) * 100; }
+    const X = t => L + (t - t0) / winSec * pw, Y = v => T + ph - Math.min(1, Math.max(0, v / ymax)) * ph;
+    c.font = '10px ' + getComputedStyle(document.body).getPropertyValue('--mono'); c.textBaseline = 'middle';
+    c.strokeStyle = '#1d2b3a'; c.fillStyle = '#53697f'; c.lineWidth = 1;
+    for (let i = 0; i <= 2; i++) { const v = ymax * i / 2, y = Y(v); c.beginPath(); c.moveTo(L, y); c.lineTo(w - R, y); c.stroke(); c.textAlign = 'right'; c.fillText(String(Math.round(v)), L - 5, y); }
+    c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    const lab = winSec >= 3600 ? (winSec / 3600) + ' h' : (winSec / 60) + ' min';
+    c.fillText('-' + lab, L + 18, h - 3); c.fillText('now', w - R - 12, h - 3);
+    (o.lines || []).forEach(l => { if (l.v > ymax) return; c.strokeStyle = l.col; c.setLineDash([4, 4]); c.beginPath(); c.moveTo(L, Y(l.v)); c.lineTo(w - R, Y(l.v)); c.stroke(); c.setLineDash([]); });
+    c.save(); c.beginPath(); c.rect(L, T, pw, ph); c.clip();
+    for (const sr of o.series) {
+      c.strokeStyle = sr.col; c.lineWidth = sr.w || 1.8; c.setLineDash(sr.dash || []); c.beginPath();
+      let first = true;
+      for (const p of hist) { if (p.t < t0 - 5) continue; const x = X(p.t), y = Y(sr.get(p)); if (first) { c.moveTo(x, y); first = false; } else c.lineTo(x, y); }
+      c.stroke();
+    }
+    c.restore(); c.setLineDash([]);
+    let lx = L + 6; c.textAlign = 'left'; c.textBaseline = 'middle';
+    for (const sr of o.series) { c.fillStyle = sr.col; c.fillRect(lx, T + 5, 10, 3); c.fillStyle = '#8097ad'; c.fillText(sr.name, lx + 14, T + 7); lx += 20 + c.measureText(sr.name).width + 8; }
+  }
+  const CH = [
+    { cv: $('c1'), ymax: 120, series: [{ name: 'thermal %', col: '#ff8a3d', get: p => p.q }, { name: 'electric MW/10', col: '#4fd8f0', get: p => p.pe / 10 }, { name: 'demand', col: '#7b93aa', get: p => p.d / 10, dash: [4, 4], w: 1.3 }] },
+    { cv: $('c2'), auto: true, min: 400, series: [{ name: 'coolant °C', col: '#4fd8f0', get: p => p.tc }, { name: 'fuel °C', col: '#ff8a3d', get: p => p.tf }], lines: [{ v: 1200, col: '#ff4d5e' }] },
+    { cv: $('c3'), ymax: 100, series: [{ name: 'steam bar', col: '#ffc233', get: p => p.p }, { name: 'inventory %', col: '#35d99b', get: p => p.m }], lines: [{ v: 85, col: '#ff4d5e' }] }
+  ];
+
+  /* ---------- UI sync ---------- */
+  function setPressed(root, attr, val) { root.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset[attr] === String(val)))); }
+  function syncControls() {
+    $('rod').value = Math.round(s.r * 100); $('rodRd').textContent = Math.round(s.r * 100) + '%';
+    $('rod').disabled = s.auto || s.tripped;
+    $('auto').setAttribute('aria-pressed', String(s.auto)); $('auto').disabled = s.tripped;
+    $('pump').value = Math.round(s.fCmd * 100); $('pumpRd').textContent = Math.round(s.f * 100) + '%';
+    $('dem').value = Math.round(s.D / 10); $('demRd').textContent = Math.round(s.D) + ' MWe';
+    $('makeup').setAttribute('aria-pressed', String(s.makeup));
+    $('tierinfo').textContent = TIERINFO[tier];
+    setPressed($('tiers'), 'tier', tier); setPressed($('speed'), 'sp', speed); setPressed($('win'), 'w', winSec);
+  }
+  function addLog(e) {
+    const li = document.createElement('li'); li.className = e.kind;
+    const t = document.createElement('time'); t.textContent = fmtTime(e.t); li.appendChild(t);
+    const m = document.createElement('span'); m.textContent = e.msg; li.appendChild(m);
+    const ul = $('log'); ul.insertBefore(li, ul.firstChild); while (ul.children.length > 60) ul.removeChild(ul.lastChild);
+    if (e.kind === 'crit') { alarm(); }
+  }
+  function flushLog() { for (const e of s.log) if (e.id > lastLogId) { lastLogId = e.id; addLog(e); } }
+  function opLog(msg, kind) { logEv(s, msg, kind || 'info'); flushLog(); }
+
+  function reset(mode) {
+    s = newPlant(tier, mode); hist = []; lastHist = -1; lastLogId = 0; meltShown = false;
+    $('log').innerHTML = ''; $('melt').hidden = true; $('stage').classList.remove('shake');
+    paused = false; $('pause').setAttribute('aria-pressed', 'false'); $('pause').textContent = 'Pause';
+    logEv(s, mode === 'standby' ? 'Hot standby: reactor critical at low power, no load. Raise power slowly.' : 'Plant at full power, Gen ' + ['I', 'II', 'III+', 'IV'][tier - 1] + '.', 'info');
+    flushLog(); syncControls(); $('scram').disabled = false;
+  }
+
+  /* ---------- sound ---------- */
+  function beep(f, d, type, vol, at) {
+    if (!soundOn || !actx) return;
+    try {
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + (at || 0);
+      o.type = type || 'square'; o.frequency.value = f; g.gain.setValueAtTime(vol || 0.05, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + d);
+    } catch (e) { /* audio unavailable */ }
+  }
+  function alarm() { beep(880, 0.18, 'square', 0.05, 0); beep(660, 0.18, 'square', 0.05, 0.22); }
+
+  /* ---------- events ---------- */
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.tier) { tier = +b.dataset.tier; reset(); return; }
+    if (b.dataset.sp) { speed = +b.dataset.sp; winSec = speed <= 5 ? 600 : (speed <= 30 ? 3600 : 14400); syncControls(); return; }
+    if (b.dataset.w) { winSec = +b.dataset.w; syncControls(); return; }
+    const e = b.dataset.ev; if (!e) return;
+    if (e === 'pump') { s.fCmd = 0; opLog('Fault: coolant pumps tripped', 'warn'); }
+    else if (e === 'load') { s.D = 0; opLog('Fault: grid load rejection, demand dropped to 0', 'warn'); }
+    else if (e === 'loca') { s.leak = 0.003; opLog('Fault: coolant leak in the primary circuit', 'warn'); }
+    else if (e === 'sbo') { s.ac = false; opLog('Fault: station blackout, all AC power lost', 'crit'); }
+    else if (e === 'ac') { if (!s.ac) { s.ac = true; opLog('AC power restored', 'ok'); } }
+    else if (e === 'reset-trip') { if (s.tripped) resetTrip(s); flushLog(); }
+    else if (e === 'makeup') { s.makeup = !s.makeup; opLog('Makeup water ' + (s.makeup ? 'on' : 'off') + (s.makeup && !s.ac ? ' (no AC power, no effect)' : ''), 'info'); }
+    else if (e === 'plug') { if (s.leak > 0) { s.leak = 0; opLog('Leak isolated', 'ok'); } }
+    else if (e === 'new-full') { reset(); return; }
+    else if (e === 'new-standby') { reset('standby'); speed = 30; winSec = 3600; syncControls(); return; }
+    syncControls();
+  });
+  $('rod').addEventListener('input', (e) => { if (!s.auto && !s.tripped) { s.rT = +e.target.value / 100; $('rodRd').textContent = e.target.value + '%'; } });
+  $('pump').addEventListener('input', (e) => { s.fCmd = +e.target.value / 100; });
+  $('dem').addEventListener('input', (e) => { s.D = +e.target.value * 10; $('demRd').textContent = Math.round(s.D) + ' MWe'; });
+  $('auto').addEventListener('click', () => { if (s.tripped) return; s.auto = !s.auto; s.ei = 0; opLog('Auto rod control ' + (s.auto ? 'on' : 'off'), 'info'); syncControls(); });
+  $('scram').addEventListener('click', () => { if (s.damage >= 2) return; if (!s.tripped) scram(s, 'operator SCRAM'); else opLog('Already tripped', 'info'); flushLog(); syncControls(); try { navigator.vibrate && navigator.vibrate(60); } catch (e) { /* no haptics */ } });
+  $('pause').addEventListener('click', () => { paused = !paused; $('pause').setAttribute('aria-pressed', String(paused)); $('pause').textContent = paused ? 'Resume' : 'Pause'; });
+  $('snd').addEventListener('click', () => {
+    soundOn = !soundOn; $('snd').setAttribute('aria-pressed', String(soundOn));
+    if (soundOn && !actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { soundOn = false; $('snd').setAttribute('aria-pressed', 'false'); } }
+    if (soundOn) beep(520, 0.12, 'sine', 0.06);
+  });
+  $('meltReset').addEventListener('click', () => reset());
+
+  /* ---------- render ---------- */
+  function setBar(g, v) {
+    const el = gEls[g.id], off = g.off || 0;
+    el.v.textContent = g.fmt(v);
+    el.bar.style.width = Math.max(0, Math.min(100, (v + off) / (g.max + off) * 100)) + '%';
+    let l = 'ok';
+    if (g.low) { if (v < g.low[1]) l = 'crit'; else if (v < g.low[0]) l = 'warn'; }
+    else if (g.crit != null) { if (v >= g.crit) l = 'crit'; else if (v >= g.warn) l = 'warn'; }
+    if (g.shortfall && s.shortfall > 50 && s.D > 0) l = 'warn';
+    el.e.dataset.l = l;
+    el.sub.textContent = g.sub ? g.sub(s) : '';
+  }
+
+  function render(dtReal) {
+    const q = s.Q / PNOM, flow = Math.max(s.f, 0.05);
+    // fuel + vessel
+    $('fuel').setAttribute('fill', ramp(FUEL, s.Tf));
+    const cov = Math.max(0, Math.min(1, s.m));
+    const wy = 190 + (1 - cov) * 200;
+    $('vWater').setAttribute('y', wy.toFixed(1)); $('vWater').setAttribute('height', (390 - wy).toFixed(1)); $('vWater').setAttribute('fill', ramp(WATER, s.Tc));
+    $('cherenkov').setAttribute('opacity', Math.min(0.9, Math.pow(Math.max(s.n, 0), 0.5) * 0.7).toFixed(2));
+    rodEls.forEach((g, i) => g.setAttribute('transform', 'translate(0 ' + (s.r * 104 + (i % 2) * 2).toFixed(1) + ')'));
+    // loop colours and flow
+    const dT = 17.5 * q / Math.max(flow, 0.15);
+    const hot = ramp(WATER, Math.min(360, s.Tc + dT)), cold = ramp(WATER, Math.max(20, s.Tc - dT));
+    hotLeg.setAttribute('stroke', hot); coldLeg.setAttribute('stroke', cold); $('tubes').setAttribute('stroke', hot);
+    dashOff -= flow * dtReal * 90;
+    hotLeg.setAttribute('stroke-dashoffset', dashOff.toFixed(1)); coldLeg.setAttribute('stroke-dashoffset', dashOff.toFixed(1));
+    angP += flow * dtReal * 420; $('pump').setAttribute('transform', 'translate(340 445) rotate(' + (angP % 360).toFixed(1) + ')');
+    // steam generator
+    const wl = 150 + (1 - Math.max(0.04, s.Ms)) * 150 + 60;
+    $('sgWater').setAttribute('y', Math.min(398, wl).toFixed(1)); $('sgWater').setAttribute('height', Math.max(2, 400 - wl).toFixed(1));
+    $('sgSteam').setAttribute('opacity', (0.08 + Math.min(1, s.p / 90) * 0.28).toFixed(2));
+    const boil = Math.min(1, s.Qsg / 3000);
+    bubbles.forEach(b => {
+      b.y -= b.v * dtReal * (0.4 + boil * 1.6); const top = Math.min(398, wl);
+      if (b.y < top - 2 || b.y > 400) b.y = 380 - (b.ph * 160 % 60);
+      b.e.setAttribute('cx', b.x); b.e.setAttribute('cy', b.y.toFixed(1));
+      b.e.setAttribute('opacity', (boil > 0.02 && b.y > top) ? (0.15 + boil * 0.6).toFixed(2) : 0);
+    });
+    // steam line, turbine, generator
+    const v = s.v * s.p / 65;
+    steamOff -= v * dtReal * 60; $('steamLine').setAttribute('stroke-dashoffset', steamOff.toFixed(1)); $('steamLine').setAttribute('opacity', Math.min(0.9, v * 0.9).toFixed(2));
+    angT += v * dtReal * 900; $('turb').firstChild.setAttribute('transform', 'rotate(' + (angT % 360).toFixed(1) + ')');
+    $('gen').setAttribute('transform', 'translate(740 190) rotate(' + (angT % 360).toFixed(1) + ')');
+    // grid
+    wireOff -= (s.Pe / 1000) * dtReal * 80; $('wire').setAttribute('stroke-dashoffset', wireOff.toFixed(1)); $('wire').setAttribute('opacity', Math.min(1, s.Pe / 80).toFixed(2));
+    const lit = Math.round(Math.min(1, s.Pe / 1000) * wins.length);
+    for (let i = 0; i < winOrder.length; i++) wins[winOrder[i]].setAttribute('fill', i < lit ? '#ffd45c' : '#1c2a3a');
+    // plume and valve puff
+    tAnim += dtReal;
+    const rej = Math.min(1, (s.Pe * 2 + s.Qdump * 0.9 + 60) / 2200 + (s.tripped ? 0 : 0));
+    plume.forEach(p => {
+      const k = (tAnim * 0.18 + p.ph) % 1;
+      p.e.setAttribute('cx', (650 + p.dx * k + Math.sin(tAnim + p.ph * 9) * 4).toFixed(1));
+      p.e.setAttribute('cy', (345 - k * 150).toFixed(1));
+      p.e.setAttribute('r', (8 + k * 20).toFixed(1));
+      p.e.setAttribute('opacity', (rej * 0.5 * (1 - k) * Math.min(1, k * 6)).toFixed(2));
+    });
+    const sv = Math.min(1, s.Qsv / 400);
+    puffs.forEach(p => {
+      const k = (tAnim * 0.9 + p.ph) % 1;
+      p.e.setAttribute('cx', (470 + (p.ph - 0.5) * 30 * k).toFixed(1)); p.e.setAttribute('cy', (140 - k * 70).toFixed(1));
+      p.e.setAttribute('r', (5 + k * 14).toFixed(1)); p.e.setAttribute('opacity', (sv * 0.9 * (1 - k)).toFixed(2));
+    });
+    // gauges / annunciators / hud
+    G.forEach(g => setBar(g, g.get(s)));
+    A.forEach((a, i) => { const l = a[1](s); annEls[i].dataset.l = l || '0'; });
+    $('clock').textContent = 'T+' + fmtTime(s.t);
+    const st = $('status'); let txt, lvl;
+    if (s.damage >= 2) { txt = 'Core meltdown'; lvl = 'crit'; }
+    else if (s.damage === 1) { txt = 'Fuel damage'; lvl = 'crit'; }
+    else if (s.tripped) { txt = 'Reactor tripped'; lvl = 'warn'; }
+    else if (q > 0.05) { txt = 'Online'; lvl = 'ok'; }
+    else { txt = 'Hot standby'; lvl = 'idle'; }
+    st.textContent = txt; st.dataset.s = lvl;
+    $('statrow').textContent = s.delivered.toFixed(2) + ' GWh delivered' + (s.tripped ? ' · ' + s.tripReason : '');
+    // sync sliders that the sim moves
+    if (s.auto || s.tripped) { $('rod').value = Math.round(s.r * 100); }
+    $('rodRd').textContent = Math.round(s.r * 100) + '%'; $('pumpRd').textContent = Math.round(s.f * 100) + '%';
+    $('rod').disabled = s.auto || s.tripped; $('auto').disabled = s.tripped; $('auto').setAttribute('aria-pressed', String(s.auto));
+    $('stage').classList.toggle('shake', s.damage >= 2 || s.Qsv > 1500);
+  }
+
+  function meltdown() {
+    meltShown = true;
+    const why = !s.ac ? 'Decay heat kept boiling the coolant long after the reactor stopped, and nothing was pumping water. This is why Gen III+ uses passive cooling.'
+      : (s.leak > 0 || s.m < 0.5) ? 'The core lost its water. Shutting down is not enough, decay heat melts uncovered fuel in minutes to hours.'
+        : 'Fuel temperature passed 2000 °C. Shutdown stops the chain reaction but decay heat needs cooling for days.';
+    $('meltWhy').textContent = why; $('melt').hidden = false; paused = true;
+    $('scram').disabled = true;
+    beep(110, 1.4, 'sawtooth', 0.08, 0);
+  }
+
+  /* ---------- main loop ---------- */
+  let last = performance.now();
+  function frame(now) {
+    const dtReal = Math.min(0.1, (now - last) / 1000); last = now;
+    if (!paused) {
+      let sim = dtReal * speed;
+      const n = Math.min(600, Math.max(1, Math.ceil(sim / 0.05))), dt = sim / n;
+      for (let i = 0; i < n; i++) {
+        step(s, dt);
+        if (s.t - lastHist >= 1) {
+          lastHist = s.t;
+          hist.push({ t: s.t, q: s.Q / PNOM * 100, pe: s.Pe, d: s.D, tc: s.Tc, tf: s.Tf, p: s.p, m: s.m * 100 });
+          if (hist.length > 15000) hist.shift();
+        }
+      }
+      flushLog();
+      if (s.damage >= 2 && !meltShown) meltdown();
+    }
+    render(paused ? 0 : dtReal);
+    CH.forEach(c => drawChart(c.cv, c));
+    requestAnimationFrame(frame);
+  }
+  document.addEventListener('visibilitychange', () => { last = performance.now(); });
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</html>
